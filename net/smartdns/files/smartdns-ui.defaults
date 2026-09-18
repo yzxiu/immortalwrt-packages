@@ -1,0 +1,13 @@
+#!/bin/sh
+# Enable the smartdns WebUI plugin by default.
+#
+# The plugin lives in the smartdns-ui package while the switch is a UCI option
+# of the smartdns package, so it is enabled from uci-defaults: installing
+# smartdns alone must not point smartdns at a plugin that is not there.
+[ -n "$(uci -q get smartdns.@smartdns[0] 2>/dev/null)" ] || exit 0
+
+uci -q set smartdns.@smartdns[0].ui='1'
+[ -n "$(uci -q get smartdns.@smartdns[0].ui_port)" ] || uci -q set smartdns.@smartdns[0].ui_port='6080'
+uci -q commit smartdns
+
+exit 0

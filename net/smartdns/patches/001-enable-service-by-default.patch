@@ -1,0 +1,9 @@
+--- a/package/openwrt/files/etc/config/smartdns
++++ b/package/openwrt/files/etc/config/smartdns
+@@ -1,4 +1,4 @@
+ config 'smartdns'
+-	option 'enabled' '0'
++	option 'enabled' '1'
+ 	
+ config 'domain-rule'
+\ No newline at end of file
