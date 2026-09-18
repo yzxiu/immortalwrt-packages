@@ -5,12 +5,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=sing-box
-PKG_VERSION:=1.12.10
-PKG_RELEASE:=3
+PKG_VERSION:=1.14.1
+PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/SagerNet/sing-box/tar.gz/v$(PKG_VERSION)?
-PKG_HASH:=476de60d3592e41ac1f0f4ae011c63b9f40adc4a6b4f8abe3c16593d3edf0d04
+PKG_HASH:=1ea41f7d06b0017fe3d3ba7ee30959048aa0ddde31cb0165dab9257edf673321
 
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=LICENSE
@@ -18,9 +18,9 @@ PKG_MAINTAINER:=Tianling Shen <cnsztl@immortalwrt.org>
 
 PKG_CONFIG_DEPENDS:= \
 	CONFIG_SING_BOX_TINY_BUILD_ACME \
+	CONFIG_SING_BOX_TINY_BUILD_BADLINKNAME \
 	CONFIG_SING_BOX_TINY_BUILD_CLASH_API \
 	CONFIG_SING_BOX_TINY_BUILD_DHCP \
-	CONFIG_SING_BOX_TINY_BUILD_EMBEDDED_TOR \
 	CONFIG_SING_BOX_TINY_BUILD_GRPC \
 	CONFIG_SING_BOX_TINY_BUILD_GVISOR \
 	CONFIG_SING_BOX_TINY_BUILD_QUIC \
@@ -35,7 +35,12 @@ PKG_BUILD_FLAGS:=no-mips16
 
 GO_PKG:=github.com/sagernet/sing-box
 GO_PKG_BUILD_PKG:=$(GO_PKG)/cmd/sing-box
-GO_PKG_LDFLAGS_X:=$(GO_PKG)/constant.Version=$(PKG_VERSION)
+# kTLS (badlinkname) relies on go:linkname into the standard library, which the
+# Go 1.23+ linker rejects unless the check is disabled.
+GO_PKG_LDFLAGS:=-checklinkname=0
+# Match upstream release/LDFLAGS: Go >= 1.24 enables MPTCP by default, upstream
+# releases turn it off; keep SHA-1 TLS signatures for legacy servers.
+GO_PKG_LDFLAGS_X:=$(GO_PKG)/constant.Version=$(PKG_VERSION) runtime.godebugDefault=multipathtcp=0,tlssha1=1
 
 include $(INCLUDE_DIR)/package.mk
 include ../../lang/golang/golang-package.mk
@@ -84,16 +89,18 @@ define Package/sing-box-tiny/config
     config SING_BOX_TINY_BUILD_ACME
     bool "Build with ACME TLS certificate issuer support"
 
+    config SING_BOX_TINY_BUILD_BADLINKNAME
+    bool "Build with go:linkname hacks (kTLS offload, raw TLS records)"
+    help
+      Requires the linker check to be disabled (-checklinkname=0), which this
+      package always passes.
+
     config SING_BOX_TINY_BUILD_CLASH_API
     bool "Build with Clash API support"
     default y
 
     config SING_BOX_TINY_BUILD_DHCP
     bool "Build with DHCP support"
-
-    config SING_BOX_TINY_BUILD_EMBEDDED_TOR
-    bool "Build with embedded Tor support"
-    depends on BROKEN
 
     config SING_BOX_TINY_BUILD_GRPC
     bool "Build with standard gPRC support"
@@ -103,6 +110,9 @@ define Package/sing-box-tiny/config
     config SING_BOX_TINY_BUILD_GVISOR
     bool "Build with gVisor support"
     default y if aarch64||arm||i386||x86_64
+    help
+      Also selects the default Tun stack: "mixed" with gVisor, "system"
+      without it.
 
     config SING_BOX_TINY_BUILD_QUIC
     bool "Build with QUIC support"
@@ -113,6 +123,11 @@ define Package/sing-box-tiny/config
 
     config SING_BOX_TINY_BUILD_TAILSCALE
     bool "Build with Tailscale support"
+    depends on SING_BOX_TINY_BUILD_GVISOR
+    help
+      The Tailscale endpoint and the DERP service are gated by the with_gvisor
+      build tag: building with Tailscale but without gVisor fails with
+      "build constraints exclude all Go files".
 
     config SING_BOX_TINY_BUILD_UTLS
     bool "Build with uTLS support"
@@ -128,13 +143,17 @@ define Package/sing-box-tiny/config
 endef
 
 ifeq ($(BUILD_VARIANT),full)
-  GO_PKG_TAGS:=with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_tailscale,with_utls,with_wireguard
+  # Performance/size oriented set: everything except the Tailscale endpoint and
+  # the newer optional protocols/services (ccm/ocm/cloudflared/usbip/openvpn/
+  # openconnect), which are not useful on a home router.
+  # badlinkname adds kTLS offload (see GO_PKG_LDFLAGS below).
+  GO_PKG_TAGS:=with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_utls,with_wireguard,with_grpc,with_v2ray_api,badlinkname
 else
   GO_PKG_TAGS:=$(subst $(space),$(comma),$(strip \
 	$(if $(CONFIG_SING_BOX_TINY_BUILD_ACME),with_acme) \
+	$(if $(CONFIG_SING_BOX_TINY_BUILD_BADLINKNAME),badlinkname) \
 	$(if $(CONFIG_SING_BOX_TINY_BUILD_CLASH_API),with_clash_api) \
 	$(if $(CONFIG_SING_BOX_TINY_BUILD_DHCP),with_dhcp) \
-	$(if $(CONFIG_SING_BOX_TINY_BUILD_EMBEDDED_TOR),with_embedded_tor) \
 	$(if $(CONFIG_SING_BOX_TINY_BUILD_GRPC),with_grpc) \
 	$(if $(CONFIG_SING_BOX_TINY_BUILD_GVISOR),with_gvisor) \
 	$(if $(CONFIG_SING_BOX_TINY_BUILD_QUIC),with_quic) \
