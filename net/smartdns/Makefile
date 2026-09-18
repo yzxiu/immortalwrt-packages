@@ -141,6 +141,7 @@ ifneq ($(CONFIG_PACKAGE_smartdns-ui),)
 		$(CARGO_PKG_CONFIG_VARS) \
 		MAKEFLAGS="$(PKG_JOBS)" \
 		WITH_ZLIB=0 \
+		RUSTFLAGS="$(CARGO_RUSTFLAGS)" \
 		TARGET_CFLAGS="$(filter-out -O%,$(TARGET_CFLAGS)) $(RUSTC_CFLAGS)" \
 		BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$(SMARTDNS_UI_SYSROOT)" \
 		cargo build -v --profile $(CARGO_PKG_PROFILE) \
