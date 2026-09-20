@@ -202,6 +202,8 @@ define Package/lighttpd/install
 	$(INSTALL_DATA) ./files/lighttpd.conf $(1)/etc/lighttpd/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/doc/config/conf.d/mime.conf $(1)/etc/lighttpd/
 	$(INSTALL_DIR) $(1)/etc/lighttpd/conf.d
+	$(INSTALL_DATA) ./files/conf.d/98-op_config.conf $(1)/etc/lighttpd/conf.d/
+	$(INSTALL_DATA) ./files/htpasswd $(1)/etc/lighttpd/
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/lighttpd.init $(1)/etc/init.d/lighttpd
 	$(INSTALL_DIR) $(1)/usr/lib/lighttpd
